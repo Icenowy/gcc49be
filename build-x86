@@ -1,0 +1,5 @@
+#! /bin/bash
+export BEARCH=x86
+export BECC=/opt/32/bin/gcc
+export BECXX=/opt/32/bin/g++
+sh build.sh
