@@ -3,18 +3,22 @@ mkdir -p buildenv-$BEARCH && cd buildenv-$BEARCH
 BUVER=2.25
 GCCVER=4.9.2
 GLCVER=2.21
-wget http://ftp.gnu.org/gnu/binutils/binutils-$BUVER.tar.bz2
-wget http://ftp.gnu.org/gnu/gcc/gcc-$GCCVER/gcc-$GCCVER.tar.bz2
-wget http://ftp.gnu.org/gnu//gmp/gmp-6.0.0a.tar.xz
-wget http://www.mpfr.org/mpfr-3.1.2/mpfr-3.1.2.tar.xz
-wget http://www.multiprecision.org/mpc/download/mpc-1.0.2.tar.gz
-wget https://www.kernel.org/pub/linux/kernel/v3.x/linux-3.19.tar.xz
-wget http://ftp.gnu.org/gnu/glibc/glibc-$GLCVER.tar.xz
+! [ "$GNUMIRROR" ] && GNUMIRROR="http://ftp.gnu.org/gnu"
+if [ ! -e sources ]; then
+axel $GNUMIRROR/binutils/binutils-$BUVER.tar.bz2
+axel $GNUMIRROR/gcc/gcc-$GCCVER/gcc-$GCCVER.tar.bz2
+axel $GNUMIRROR//gmp/gmp-6.0.0a.tar.xz
+axel http://www.mpfr.org/mpfr-3.1.2/mpfr-3.1.2.tar.xz
+axel http://www.multiprecision.org/mpc/download/mpc-1.0.2.tar.gz
+wget https://www.kernel.org/pub/linux/kernel/v3.x/linux-3.19.tar.xz # axel may fail
+axel $GNUMIRROR/glibc/glibc-$GLCVER.tar.xz
+touch sources
+fi
 tar xvf binutils-$BUVER.tar.bz2
 [ "$BUCLEAN" = "1" ] && rm -rf binutils-build-pass1
 mkdir -p binutils-build-pass1
 cd binutils-build-pass1
-../binutils-$BUVER/configure --prefix=/opt/gcc49be --with-lib-path=/opt/gcc49be/lib --disable-nls --disable-werror && make $ABMK && make install
+CC=$BECC CXX=$BECXX ../binutils-$BUVER/configure --prefix=/opt/gcc49be --with-lib-path=/opt/gcc49be/lib --disable-nls --disable-werror && make $ABMK && make install
 cd ..
 tar xvf gcc-$GCCVER.tar.bz2
 cd gcc-$GCCVER
@@ -43,7 +47,7 @@ cd gcc-$GCCVER-1
 sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure
 mkdir -pv ../gcc-build-pass1
 cd ../gcc-build-pass1
-../gcc-$VER/configure --prefix=/opt/gcc49be --with-newlib  \
+CC=$BECC CXX=$BECXX ../gcc-$GCCVER/configure --prefix=/opt/gcc49be --with-newlib  \
     --without-headers                                \
     --with-local-prefix=/opt/gcc49be \
     --with-native-system-header-dir=/opt/gcc49be/include \
@@ -69,13 +73,16 @@ make mrproper
 make INSTALL_HDR_PATH=dest headers_install
 mkdir -p /opt/gcc49be/include
 cp -rv dest/include/* /opt/gcc49be/include
+cd ..
 tar xvf glibc-$GLCVER.tar.xz
+cd glibc-$GLCVER
 sed -e '/ia32/s/^/1:/' \
     -e '/SSE2/s/^1://' \
     -i  sysdeps/i386/i686/multiarch/mempcpy_chk.S
 mkdir -v ../glibc-build
 cd ../glibc-build
-../glibc-2.21/configure                             \
+../glibc-$GLCVER/configure                             \
+      $([ "$BEARCH" = "x86" ] && echo "--host=i686-pc-linux-gnu") \
       --prefix=/opt/gcc49be \
       --disable-profile                             \
       --enable-kernel=2.6.32                        \
@@ -84,7 +91,7 @@ cd ../glibc-build
       libc_cv_ctors_header=yes                      \
       libc_cv_c_cleanup=yes && make $ABMK && make install
 echo 'main(){}' > dummy.c
-$LFS_TGT-gcc dummy.c
+gcc dummy.c
 (readelf -l a.out | grep ': /tools') || exit 1
 cd ..
 mkdir -p libstdcxx-build
@@ -117,7 +124,7 @@ cd ../gcc-build
     --disable-multilib                               \
     --disable-bootstrap && make && make install
 echo 'main(){}' > dummy.c
-cc dummy.c
+gcc dummy.c
 (readelf -l a.out | grep ': /tools') || exit 1
 
 
